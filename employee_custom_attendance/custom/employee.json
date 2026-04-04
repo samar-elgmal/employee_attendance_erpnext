@@ -1,0 +1,23 @@
+[
+  {
+    "doctype": "Custom Field",
+    "dt": "Employee",
+    "fieldname": "custom_attendance_system",
+    "fieldtype": "Select",
+    "label": "Attendance System",
+    "options": "Standard\nFlexible Hours",
+    "default": "Standard",
+    "insert_after": "department",
+    "module": "Employee Custom Attendance"
+  },
+  {
+    "doctype": "Custom Field",
+    "dt": "Employee",
+    "fieldname": "custom_lateness_cap_notified",
+    "fieldtype": "Data",
+    "label": "Lateness Cap Notified Month",
+    "hidden": 1,
+    "insert_after": "custom_attendance_system",
+    "module": "Employee Custom Attendance"
+  }
+]

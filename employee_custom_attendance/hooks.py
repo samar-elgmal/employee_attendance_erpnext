@@ -145,6 +145,28 @@ app_license = "mit"
 # 	}
 # }
 
+doc_events = {
+	"Employee Checkin": {
+		"validate": "employee_custom_attendance.attendance.checkin.on_checkin_validate"
+	},
+	"Employee": {
+		"on_update": "employee_custom_attendance.attendance.employee_hooks.on_employee_update"
+	},
+}
+
+scheduler_events = {
+	"daily": [
+		"employee_custom_attendance.attendance.daily_job.process_flex_attendance"
+	]
+}
+
+fixtures = [
+	{
+		"doctype": "Custom Field",
+		"filters": [["dt", "=", "Employee"], ["module", "=", "Employee Custom Attendance"]],
+	}
+]
+
 # Scheduled Tasks
 # ---------------
 
