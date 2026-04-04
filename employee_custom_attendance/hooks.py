@@ -4,6 +4,7 @@ app_publisher = "samar"
 app_description = "Employee Custom Attendance"
 app_email = "samar.elgmal@gmail.com"
 app_license = "mit"
+after_install = "employee_custom_attendance.install.after_install"
 
 # Apps
 # ------------------
