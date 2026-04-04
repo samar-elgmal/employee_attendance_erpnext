@@ -1,0 +1,67 @@
+{
+  "actions": [],
+  "creation": "2026-04-04 00:00:00.000000",
+  "doctype": "DocType",
+  "document_type": "Document",
+  "engine": "InnoDB",
+  "field_order": [
+    "weekly_target_hours",
+    "daily_min_hours",
+    "daily_max_hours",
+    "penalty_type_for_shortfall",
+    "job_run_time"
+  ],
+  "fields": [
+    {
+      "default": "54",
+      "fieldname": "weekly_target_hours",
+      "fieldtype": "Float",
+      "label": "Weekly Target Hours (incl. rest)"
+    },
+    {
+      "default": "7",
+      "fieldname": "daily_min_hours",
+      "fieldtype": "Float",
+      "label": "Daily Minimum Hours"
+    },
+    {
+      "default": "11",
+      "fieldname": "daily_max_hours",
+      "fieldtype": "Float",
+      "label": "Daily Maximum Hours (cap)"
+    },
+    {
+      "fieldname": "penalty_type_for_shortfall",
+      "fieldtype": "Link",
+      "label": "Penalty Type for Daily Shortfall",
+      "options": "Penalty Type"
+    },
+    {
+      "default": "23:00:00",
+      "fieldname": "job_run_time",
+      "fieldtype": "Time",
+      "label": "Daily Job Run Time"
+    }
+  ],
+  "issingle": 1,
+  "links": [],
+  "modified": "2026-04-04 00:00:00.000000",
+  "modified_by": "Administrator",
+  "module": "Employee Custom Attendance",
+  "name": "Flexible Hours Settings",
+  "owner": "Administrator",
+  "permissions": [
+    {
+      "create": 1, "delete": 1, "email": 1, "print": 1,
+      "read": 1, "role": "System Manager", "share": 1, "write": 1
+    },
+    {
+      "create": 1, "delete": 1, "email": 1, "print": 1,
+      "read": 1, "role": "HR Manager", "share": 1, "write": 1
+    }
+  ],
+  "sort_field": "modified",
+  "sort_order": "DESC",
+  "states": [],
+  "track_changes": 1
+}
