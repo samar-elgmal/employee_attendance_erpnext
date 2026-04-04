@@ -167,27 +167,6 @@ fixtures = [
 	}
 ]
 
-# Scheduled Tasks
-# ---------------
-
-# scheduler_events = {
-# 	"all": [
-# 		"employee_custom_attendance.tasks.all"
-# 	],
-# 	"daily": [
-# 		"employee_custom_attendance.tasks.daily"
-# 	],
-# 	"hourly": [
-# 		"employee_custom_attendance.tasks.hourly"
-# 	],
-# 	"weekly": [
-# 		"employee_custom_attendance.tasks.weekly"
-# 	],
-# 	"monthly": [
-# 		"employee_custom_attendance.tasks.monthly"
-# 	],
-# }
-
 # Testing
 # -------
 
