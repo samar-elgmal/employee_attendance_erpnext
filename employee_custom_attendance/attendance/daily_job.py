@@ -105,17 +105,19 @@ def _has_approved_leave(employee, date):
 
 def _create_attendance(employee, date, status, working_hours, in_time, out_time):
 	company = frappe.db.get_value("Employee", employee, "company")
-	att = frappe.get_doc({
-		"doctype": "Attendance",
-		"employee": employee,
-		"attendance_date": date,
-		"status": status,
-		"working_hours": working_hours,
-		"in_time": in_time,
-		"out_time": out_time,
-		"shift": "Flexible Hours",
-		"company": company,
-	})
+	att = frappe.get_doc(
+		{
+			"doctype": "Attendance",
+			"employee": employee,
+			"attendance_date": date,
+			"status": status,
+			"working_hours": working_hours,
+			"in_time": in_time,
+			"out_time": out_time,
+			"shift": "Flexible Hours",
+			"company": company,
+		}
+	)
 	att.insert(ignore_permissions=True)
 	att.submit()
 	return att
@@ -139,16 +141,18 @@ def _handle_missing_fingerprint(employee, date, settings):
 	status = "Half Day" if missing_count >= 3 else "Absent"
 	company = frappe.db.get_value("Employee", employee, "company")
 
-	att = frappe.get_doc({
-		"doctype": "Attendance",
-		"employee": employee,
-		"attendance_date": date,
-		"status": status,
-		"working_hours": 0,
-		"shift": "Flexible Hours",
-		"company": company,
-		"custom_missing_fingerprint": 1,
-	})
+	att = frappe.get_doc(
+		{
+			"doctype": "Attendance",
+			"employee": employee,
+			"attendance_date": date,
+			"status": status,
+			"working_hours": 0,
+			"shift": "Flexible Hours",
+			"company": company,
+			"custom_missing_fingerprint": 1,
+		}
+	)
 	att.insert(ignore_permissions=True)
 	att.submit()
 
@@ -165,16 +169,17 @@ def _create_shortfall_penalty(employee, date, effective_hours, settings):
 	):
 		return
 
-	penalty = frappe.get_doc({
-		"doctype": "Employee Penalty",
-		"employee": employee,
-		"penalty_date": date,
-		"penalty_month": get_first_day(date),
-		"penalty_type": settings.penalty_type_for_shortfall,
-		"remarks": (
-			f"Flexible hours shortfall: {effective_hours:.1f}h"
-			f" / {settings.daily_min_hours}h required"
-		),
-	})
+	penalty = frappe.get_doc(
+		{
+			"doctype": "Employee Penalty",
+			"employee": employee,
+			"penalty_date": date,
+			"penalty_month": get_first_day(date),
+			"penalty_type": settings.penalty_type_for_shortfall,
+			"remarks": (
+				f"Flexible hours shortfall: {effective_hours:.1f}h / {settings.daily_min_hours}h required"
+			),
+		}
+	)
 	penalty.insert(ignore_permissions=True)
 	# Leave as docstatus=0 (Draft) for HR to review and submit
