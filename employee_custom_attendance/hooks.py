@@ -164,7 +164,10 @@ scheduler_events = {
 fixtures = [
 	{
 		"doctype": "Custom Field",
-		"filters": [["dt", "=", "Employee"], ["module", "=", "Employee Custom Attendance"]],
+		"filters": [
+			["dt", "in", ["Employee", "Attendance"]],
+			["module", "=", "Employee Custom Attendance"],
+		],
 	}
 ]
 
