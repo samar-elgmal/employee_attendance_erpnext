@@ -1,5 +1,5 @@
 import frappe
-from frappe.utils import get_first_day, get_last_day, flt, formatdate
+from frappe.utils import flt, formatdate, get_first_day, get_last_day
 
 
 def _get_hr_recipients():

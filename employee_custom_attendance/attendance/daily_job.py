@@ -1,6 +1,5 @@
 import frappe
-from frappe.utils import get_first_day, get_last_day, getdate, today, flt
-
+from frappe.utils import flt, get_first_day, get_last_day, getdate, today
 from hrms.hr.doctype.employee_checkin.employee_checkin import (
 	calculate_working_hours,
 	update_attendance_in_checkins,
@@ -25,7 +24,7 @@ def process_flex_attendance():
 			)
 
 	# Notifications run for ALL active employees (Standard + Flexible)
-	from employee_custom_attendance.attendance.notifications import notify_lateness_cap, notify_article_69
+	from employee_custom_attendance.attendance.notifications import notify_article_69, notify_lateness_cap
 
 	all_employees = frappe.get_all("Employee", filters={"status": "Active"}, pluck="name")
 	for employee in all_employees:

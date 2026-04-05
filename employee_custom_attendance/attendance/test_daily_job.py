@@ -1,7 +1,8 @@
+from datetime import datetime
+
 import frappe
 from frappe.tests.utils import FrappeTestCase
-from frappe.utils import now_datetime, today, add_days, get_first_day, getdate
-from datetime import datetime
+from frappe.utils import add_days, get_first_day, getdate, now_datetime, today
 
 
 def make_flex_employee():
@@ -101,7 +102,7 @@ class TestDailyJobAttendance(FrappeTestCase):
 		date = getdate(today())
 		base = datetime.combine(date, datetime.min.time())
 
-		# 8:00–12:00 (4h) + 13:00–17:00 (4h) = 8 total
+		# 8:00-12:00 (4h) + 13:00-17:00 (4h) = 8 total
 		make_checkin(emp.name, base.replace(hour=8), "IN")
 		make_checkin(emp.name, base.replace(hour=12), "OUT")
 		make_checkin(emp.name, base.replace(hour=13), "IN")

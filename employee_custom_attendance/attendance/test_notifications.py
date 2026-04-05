@@ -1,7 +1,8 @@
+from unittest.mock import patch
+
 import frappe
 from frappe.tests.utils import FrappeTestCase
-from frappe.utils import today, get_first_day, add_days, getdate
-from unittest.mock import patch
+from frappe.utils import add_days, get_first_day, getdate, today
 
 
 def make_employee_with_attendance(attendance_system, late_hours):
