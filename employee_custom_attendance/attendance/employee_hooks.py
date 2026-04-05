@@ -24,13 +24,15 @@ def _ensure_flex_assignment(employee):
 	if exists:
 		return
 
-	assignment = frappe.get_doc({
-		"doctype": "Shift Assignment",
-		"employee": employee,
-		"shift_type": "Flexible Hours",
-		"start_date": today(),
-		"status": "Active",
-	})
+	assignment = frappe.get_doc(
+		{
+			"doctype": "Shift Assignment",
+			"employee": employee,
+			"shift_type": "Flexible Hours",
+			"start_date": today(),
+			"status": "Active",
+		}
+	)
 	assignment.insert(ignore_permissions=True)
 	assignment.submit()
 

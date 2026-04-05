@@ -5,16 +5,18 @@ from frappe.utils import today
 
 def make_employee(attendance_system="Standard"):
 	company = frappe.defaults.get_global_default("company") or frappe.get_all("Company", pluck="name")[0]
-	emp = frappe.get_doc({
-		"doctype": "Employee",
-		"first_name": "Hook",
-		"last_name": "Test",
-		"company": company,
-		"date_of_joining": "2025-01-01",
-		"date_of_birth": "1990-01-01",
-		"gender": "Male",
-		"custom_attendance_system": attendance_system,
-	})
+	emp = frappe.get_doc(
+		{
+			"doctype": "Employee",
+			"first_name": "Hook",
+			"last_name": "Test",
+			"company": company,
+			"date_of_joining": "2025-01-01",
+			"date_of_birth": "1990-01-01",
+			"gender": "Male",
+			"custom_attendance_system": attendance_system,
+		}
+	)
 	emp.insert(ignore_permissions=True)
 	return emp
 
@@ -49,6 +51,7 @@ class TestEmployeeHook(FrappeTestCase):
 		emp = make_employee("Flexible Hours")
 		# trigger hook to create assignment
 		from employee_custom_attendance.attendance.employee_hooks import on_employee_update
+
 		on_employee_update(emp, None)
 
 		emp.custom_attendance_system = "Standard"
@@ -61,6 +64,7 @@ class TestEmployeeHook(FrappeTestCase):
 	def test_no_duplicate_assignment_on_repeated_save(self):
 		emp = make_employee("Flexible Hours")
 		from employee_custom_attendance.attendance.employee_hooks import on_employee_update
+
 		on_employee_update(emp, None)
 		on_employee_update(emp, None)  # called twice
 

@@ -7,30 +7,34 @@ from frappe.utils import add_days, get_first_day, getdate, now_datetime, today
 
 def make_flex_employee():
 	company = frappe.defaults.get_global_default("company") or frappe.get_all("Company", pluck="name")[0]
-	emp = frappe.get_doc({
-		"doctype": "Employee",
-		"first_name": "FlexJob",
-		"last_name": "Test",
-		"company": company,
-		"date_of_joining": "2025-01-01",
-		"date_of_birth": "1990-01-01",
-		"gender": "Male",
-		"custom_attendance_system": "Flexible Hours",
-	})
+	emp = frappe.get_doc(
+		{
+			"doctype": "Employee",
+			"first_name": "FlexJob",
+			"last_name": "Test",
+			"company": company,
+			"date_of_joining": "2025-01-01",
+			"date_of_birth": "1990-01-01",
+			"gender": "Male",
+			"custom_attendance_system": "Flexible Hours",
+		}
+	)
 	emp.insert(ignore_permissions=True)
 	return emp
 
 
 def make_checkin(employee, dt, log_type):
 	"""Create a saved Employee Checkin with skip_auto_attendance=1."""
-	doc = frappe.get_doc({
-		"doctype": "Employee Checkin",
-		"employee": employee,
-		"time": dt,
-		"log_type": log_type,
-		"shift": "Flexible Hours",
-		"skip_auto_attendance": 1,
-	})
+	doc = frappe.get_doc(
+		{
+			"doctype": "Employee Checkin",
+			"employee": employee,
+			"time": dt,
+			"log_type": log_type,
+			"shift": "Flexible Hours",
+			"skip_auto_attendance": 1,
+		}
+	)
 	doc.flags.ignore_validate = True
 	doc.insert(ignore_permissions=True)
 	return doc
@@ -42,6 +46,7 @@ class TestDailyJobAttendance(FrappeTestCase):
 
 	def test_present_when_hours_meet_minimum(self):
 		from employee_custom_attendance.attendance.daily_job import process_employee_for_date
+
 		emp = make_flex_employee()
 		date = getdate(today())
 		base = datetime.combine(date, datetime.min.time())
@@ -62,6 +67,7 @@ class TestDailyJobAttendance(FrappeTestCase):
 
 	def test_absent_when_hours_below_minimum(self):
 		from employee_custom_attendance.attendance.daily_job import process_employee_for_date
+
 		emp = make_flex_employee()
 		date = getdate(today())
 		base = datetime.combine(date, datetime.min.time())
@@ -80,6 +86,7 @@ class TestDailyJobAttendance(FrappeTestCase):
 
 	def test_hours_capped_at_daily_max(self):
 		from employee_custom_attendance.attendance.daily_job import process_employee_for_date
+
 		emp = make_flex_employee()
 		date = getdate(today())
 		base = datetime.combine(date, datetime.min.time())
@@ -98,6 +105,7 @@ class TestDailyJobAttendance(FrappeTestCase):
 
 	def test_multiple_intervals_summed(self):
 		from employee_custom_attendance.attendance.daily_job import process_employee_for_date
+
 		emp = make_flex_employee()
 		date = getdate(today())
 		base = datetime.combine(date, datetime.min.time())
@@ -119,6 +127,7 @@ class TestDailyJobAttendance(FrappeTestCase):
 
 	def test_idempotent_second_run(self):
 		from employee_custom_attendance.attendance.daily_job import process_employee_for_date
+
 		emp = make_flex_employee()
 		date = getdate(today())
 		base = datetime.combine(date, datetime.min.time())
@@ -136,6 +145,7 @@ class TestDailyJobAttendance(FrappeTestCase):
 
 	def test_missing_fingerprint_marks_half_day_after_3(self):
 		from employee_custom_attendance.attendance.daily_job import process_employee_for_date
+
 		emp = make_flex_employee()
 		company = frappe.db.get_value("Employee", emp.name, "company")
 		# Simulate 3 prior no-checkin days this month
@@ -143,14 +153,16 @@ class TestDailyJobAttendance(FrappeTestCase):
 		for i in range(3):
 			d = add_days(month_start, i)
 			if getdate(d) < getdate(today()):
-				att = frappe.get_doc({
-					"doctype": "Attendance",
-					"employee": emp.name,
-					"attendance_date": d,
-					"status": "Absent",
-					"company": company,
-					"custom_missing_fingerprint": 1,
-				})
+				att = frappe.get_doc(
+					{
+						"doctype": "Attendance",
+						"employee": emp.name,
+						"attendance_date": d,
+						"status": "Absent",
+						"company": company,
+						"custom_missing_fingerprint": 1,
+					}
+				)
 				att.insert(ignore_permissions=True)
 				att.submit()
 
