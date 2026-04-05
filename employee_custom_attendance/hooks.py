@@ -4,6 +4,7 @@ app_publisher = "samar"
 app_description = "Employee Custom Attendance"
 app_email = "samar.elgmal@gmail.com"
 app_license = "mit"
+after_install = "employee_custom_attendance.install.after_install"
 
 # Apps
 # ------------------
@@ -145,26 +146,30 @@ app_license = "mit"
 # 	}
 # }
 
-# Scheduled Tasks
-# ---------------
+doc_events = {
+	"Employee Checkin": {
+		"validate": "employee_custom_attendance.attendance.checkin.on_checkin_validate"
+	},
+	"Employee": {
+		"on_update": "employee_custom_attendance.attendance.employee_hooks.on_employee_update"
+	},
+}
 
-# scheduler_events = {
-# 	"all": [
-# 		"employee_custom_attendance.tasks.all"
-# 	],
-# 	"daily": [
-# 		"employee_custom_attendance.tasks.daily"
-# 	],
-# 	"hourly": [
-# 		"employee_custom_attendance.tasks.hourly"
-# 	],
-# 	"weekly": [
-# 		"employee_custom_attendance.tasks.weekly"
-# 	],
-# 	"monthly": [
-# 		"employee_custom_attendance.tasks.monthly"
-# 	],
-# }
+scheduler_events = {
+	"daily": [
+		"employee_custom_attendance.attendance.daily_job.process_flex_attendance"
+	]
+}
+
+fixtures = [
+	{
+		"doctype": "Custom Field",
+		"filters": [
+			["dt", "in", ["Employee", "Attendance"]],
+			["module", "=", "Employee Custom Attendance"],
+		],
+	}
+]
 
 # Testing
 # -------
