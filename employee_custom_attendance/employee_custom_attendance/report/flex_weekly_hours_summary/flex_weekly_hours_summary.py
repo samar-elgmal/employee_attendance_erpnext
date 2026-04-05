@@ -1,6 +1,5 @@
 import frappe
 from frappe.utils import getdate, add_days, flt
-from collections import defaultdict
 
 
 def execute(filters=None):
@@ -57,7 +56,10 @@ def get_data(filters):
 		fields=["employee", "attendance_date", "working_hours"],
 	)
 
-	buckets = defaultdict(lambda: {"total_hours": 0.0, "days_below_min": 0})
+	from collections import defaultdict
+
+	buckets = defaultdict(lambda: {"total_hours": 0, "days_below_min": 0})
+
 	for row in attendance:
 		week_start = _get_week_start(getdate(row.attendance_date))
 		key = (row.employee, week_start)
