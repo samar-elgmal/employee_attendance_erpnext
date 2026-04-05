@@ -24,6 +24,20 @@ def process_flex_attendance():
 				f"Flex attendance error: {employee} on {date}",
 			)
 
+	# Notifications run for ALL active employees (Standard + Flexible)
+	from employee_custom_attendance.attendance.notifications import notify_lateness_cap, notify_article_69
+
+	all_employees = frappe.get_all("Employee", filters={"status": "Active"}, pluck="name")
+	for employee in all_employees:
+		try:
+			notify_lateness_cap(employee, date)
+			notify_article_69(employee, date)
+		except Exception:
+			frappe.log_error(
+				frappe.get_traceback(),
+				f"Notification error: {employee} on {date}",
+			)
+
 
 def process_employee_for_date(employee, date):
 	"""Process one flex employee for a given date. Idempotent."""
