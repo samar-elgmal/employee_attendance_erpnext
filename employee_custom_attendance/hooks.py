@@ -5,6 +5,7 @@ app_description = "Employee Custom Attendance"
 app_email = "samar.elgmal@gmail.com"
 app_license = "mit"
 after_install = "employee_custom_attendance.install.after_install"
+after_migrate = "employee_custom_attendance.install.after_migrate"
 
 # Apps
 # ------------------
@@ -157,7 +158,10 @@ doc_events = {
 
 scheduler_events = {
 	"daily": [
-		"employee_custom_attendance.attendance.daily_job.process_flex_attendance"
+		"employee_custom_attendance.attendance.daily_job.process_flex_attendance",
+		# Grace-period-aware replacement for HRMS's stock job of the same purpose,
+		# which is disabled in install.py. See shift_expiry.py for why.
+		"employee_custom_attendance.attendance.shift_expiry.mark_expired_shift_assignments_as_inactive",
 	]
 }
 
