@@ -78,7 +78,12 @@ class Session(NamedTuple):
     out_log: dict
     duration: float     # hours
     attendance_date: date   # in_log.time's date — the attribution key
+    crosses_midnight: bool  # out_log.time.date() != in_log.time.date()
 ```
+
+`crosses_midnight` isn't consumed by any logic yet — it's carried for future
+reporting (e.g. flagging overnight sessions in the weekly summary report)
+now that it's nearly free to compute during session-building.
 
 Everything downstream of pairing (totals, `in_time`/`out_time`, which
 checkins get claimed) operates on `Session` objects, not raw logs.
@@ -108,56 +113,106 @@ Same filters as today: `employee`, `time between [day_start, day_end]`,
 ### Dedup (`_dedupe_checkins`)
 
 ```python
-def _dedupe_checkins(logs, threshold_minutes=2):
+DEDUP_THRESHOLD_SECONDS = 60
+
+def _dedupe_checkins(logs, threshold_seconds=DEDUP_THRESHOLD_SECONDS):
     kept = []
     for log in logs:
-        if kept and (log.time - kept[-1].time) <= timedelta(minutes=threshold_minutes):
+        if kept and (log.time - kept[-1].time) <= timedelta(seconds=threshold_seconds):
             continue
         kept.append(log)
     return kept
 ```
 
-Collapses **any** two consecutive checkins within 2 minutes into one (keep
+Collapses **any** two consecutive checkins within 60 seconds into one (keep
 the first), regardless of `log_type` — since `log_type` can't be trusted to
 tell a true duplicate scan from a real fast IN/OUT, a type-agnostic gap
-check is the only reliable signal available. Runs once, immediately after
-fetch, before pairing.
+check is the only reliable signal available. Narrowed from an earlier 2-minute
+draft to 60 seconds: true device double-scans happen within seconds, and a
+wider threshold risks eating a real, if unusually quick, punch. Runs once,
+immediately after fetch, before pairing.
 
 ### Build Sessions (`_build_sessions`)
 
 ```python
-MIN_SESSION_HOURS = 10 / 60   # 10 minutes
-MAX_SESSION_HOURS = 20
+MIN_SESSION_HOURS = 5 / 60   # 5 minutes — anomaly signal only, not a hard rule
+
+def _is_plausible(duration, max_session_hours):
+    return MIN_SESSION_HOURS <= duration <= max_session_hours
 
 def _build_sessions(logs, employee):
+    max_session_hours = frappe.get_single("Flexible Hours Settings").max_session_hours
     sessions = []
+    anomalies = []
     i = 0
     while i + 1 < len(logs):
         in_log, out_log = logs[i], logs[i + 1]
         duration = time_diff_in_hours(in_log.time, out_log.time)
-        if duration < MIN_SESSION_HOURS or duration > MAX_SESSION_HOURS:
-            frappe.log_error(
-                f"{in_log.time} -> {out_log.time} ({duration:.2f}h) is outside "
-                f"a plausible single-session range — likely a desynced double-punch "
-                f"dedup didn't catch. Stopping session-build for this window; "
-                f"remaining checkins for {employee} left unclaimed for manual review.",
-                "Flex attendance pairing anomaly",
-            )
-            break
-        sessions.append(Session(in_log, out_log, duration, getdate(in_log.time)))
-        i += 2
-    return sessions
+
+        if _is_plausible(duration, max_session_hours):
+            sessions.append(_make_session(in_log, out_log, duration))
+            i += 2
+            continue
+
+        anomalies.append((in_log, out_log, duration))
+
+        # Bounded resync: assume in_log was a stray extra punch dedup
+        # didn't catch, and try pairing out_log against the *next* log
+        # instead. If that's plausible, the rest of the window recovers
+        # normally. If it's also implausible, this isn't one stray punch —
+        # stop rather than keep guessing.
+        if i + 2 < len(logs):
+            retry_out = logs[i + 2]
+            retry_duration = time_diff_in_hours(out_log.time, retry_out.time)
+            if _is_plausible(retry_duration, max_session_hours):
+                sessions.append(_make_session(out_log, retry_out, retry_duration))
+                i += 3
+                continue
+
+        break
+
+    if anomalies:
+        frappe.log_error(
+            "\n".join(
+                f"{a[0].time} -> {a[1].time} ({a[2]:.2f}h) outside plausible range"
+                for a in anomalies
+            ),
+            f"Flex attendance pairing anomaly: {employee}",
+        )
+
+    return sessions, anomalies
+
+
+def _make_session(in_log, out_log, duration):
+    return Session(
+        in_log, out_log, duration, getdate(in_log.time),
+        crosses_midnight=getdate(out_log.time) != getdate(in_log.time),
+    )
 ```
 
 Walks the deduped, chronological list positionally (same alternating
-assumption as today — `log_type` still isn't used). The only new signal is
-duration plausibility: a pair whose gap is too short (a same-type near-punch
-dedup didn't catch, e.g. two INs 6 minutes apart) or absurdly long (>20h,
-almost certainly a desync elsewhere) stops session-building **at that
-point** — sessions already built earlier in the window are kept; the
-anomalous pair and everything after it in this window are left unclaimed
-(not linked to any Attendance), available for manual review and reprocessing
-via `reset_and_reprocess` once the underlying data issue is understood.
+assumption as today — `log_type` still isn't used). The new signal is
+duration plausibility: a pair whose gap is too short (a near-punch dedup
+didn't catch, e.g. two punches 4 minutes apart) or too long (beyond
+`max_session_hours`) is implausible as a single real session.
+
+On an implausible pair, the algorithm doesn't just discard it and resume two
+positions later — that would silently shift every later pair by one position
+and can produce a plausible-looking but wrong total (see design discussion:
+skipping `(08:00,08:04)` in `08:00,08:04,17:00,20:00,23:00` and resuming at
+`17:00` mis-pairs `(17:00,20:00)` as a fabricated 3h session and stops
+`23:00` from ever pairing, instead of recovering the true `08:04→17:00` and
+`20:00→23:00` sessions). Instead it drops only `in_log` (the presumed stray)
+and retries `out_log` against the next log — recovering the rest of the
+window correctly in the common single-stray-punch case. Only if that retry
+is *also* implausible does it give up and stop building further sessions in
+this window; sessions already built are kept, everything from that point is
+left unclaimed for manual review and reprocessing via `reset_and_reprocess`.
+
+Every implausible pair encountered (whether ultimately recovered or not) is
+recorded in `anomalies` and logged via `frappe.log_error` — so a recovered
+single stray punch still leaves an audit trail, even though it didn't halt
+processing.
 
 A trailing unmatched single log (odd count) is simply never reached by the
 `i + 1 < len(logs)` loop bound — same effective behavior as today's
@@ -172,7 +227,7 @@ if not raw_logs:
     _mark_absent_or_skip_holiday(...)
     return
 
-sessions = _build_sessions(raw_logs, employee)
+sessions, _anomalies = _build_sessions(raw_logs, employee)  # already logged inside
 day_sessions = [s for s in sessions if s.attendance_date == date]
 
 if not day_sessions:
@@ -218,8 +273,9 @@ only one were updated.
 |---|---|
 | Next-day early session falls inside today's window | Never merged into today's total, regardless of checkin count parity — filtered out by IN date after pairing, left unclaimed for its own day |
 | Overnight session (single or back-to-back multiple) | Attributed entirely to its IN date; supported natively by pair-then-filter, no window-edge special casing |
-| Device double-scan within 2 min | Collapsed by dedup before pairing, regardless of type |
-| Pairing desync not caught by dedup (e.g. two real-but-close punches of unknown type) | Detected via implausible session duration (<10min or >20h); session-building stops at that point, anomaly logged via `frappe.log_error`, sessions before it are kept, everything from the anomaly onward is left unclaimed |
+| Device double-scan within 60 sec | Collapsed by dedup before pairing, regardless of type |
+| Single stray punch beyond dedup's threshold (e.g. two punches 6 min apart, not caught by 60s dedup) | Detected via implausible session duration; bounded resync drops the presumed stray and retries against the next log — recovers the rest of the window's sessions correctly in the common case, logs the anomaly either way |
+| Pairing desync that resync can't recover (retry also implausible) | Session-building stops at that point; sessions before it are kept, everything from the anomaly onward is left unclaimed for manual review / `reset_and_reprocess` |
 | Missing OUT (trailing unmatched IN) | Same as today: not included in any session, stays unclaimed until a future run finds its OUT |
 
 Also update:
@@ -228,9 +284,10 @@ Also update:
   same effective default as today).
 - **Assumption #3** ("checkins strictly alternate IN/OUT... a double punch
   desyncs pairing for the rest of the day") → narrowed: dedup handles
-  near-simultaneous duplicates; the duration-anomaly check contains (not
-  eliminates) desyncs beyond that, to the point they occur rather than the
-  rest of the day.
+  near-simultaneous duplicates; a single stray punch beyond that is
+  self-corrected by the bounded resync in `_build_sessions`; only a genuine
+  multi-punch desync (retry also implausible) still stops session-building
+  at that point rather than the rest of the day.
 
 ## Rollout
 
@@ -251,12 +308,21 @@ Extend `test_daily_job.py`:
   run, gets its own hours (not zero/Absent).
 - Multiple-overnight-in-a-row: `1/7 22:00→2/7 01:00`, `2/7 10:00→2/7 12:00`,
   `2/7 15:00→2/7 18:00` → 1/7 = 3h; 2/7 = 2h + 3h = 5h.
-- Dedup: a same-type duplicate within 2 min collapses to one checkin and
-  doesn't affect the resulting session.
-- Duration-anomaly: `08:00 IN, 08:06 IN, 17:00 OUT` (dedup doesn't catch it,
-  6 min > 2 min threshold) → no session built past the anomaly, no
-  Attendance created from a bogus 6-minute pairing, `frappe.log_error`
-  called.
+- Same-day, multiple sessions plus a trailing overnight one:
+  `08:00→12:00`, `13:00→18:00`, `19:00→01:00(next day)` → all three
+  attribute to the first day (their IN date), totaling 4h + 5h + 6h = 15h.
+- Dedup: a duplicate within 60 sec (either same or different `log_type`)
+  collapses to one checkin and doesn't affect the resulting session.
+- Anomaly resync recovers the rest of the day: `08:00, 08:04, 17:00, 20:00,
+  23:00` (a stray punch at 08:04 — 4 min gap, below `MIN_SESSION_HOURS` but
+  beyond the 60s dedup threshold) → `08:04→17:00` and `20:00→23:00` are both
+  recovered as real sessions (not the fabricated `17:00→20:00`), `08:00` is
+  left unclaimed, and `frappe.log_error` is called once for the recovered
+  anomaly.
+- Anomaly resync fails (genuinely broken data): a sequence where both the
+  original pair and the resync retry are implausible → session-building
+  stops at that point, sessions built before it are kept, no Attendance is
+  fabricated from the unresolvable portion, `frappe.log_error` is called.
 - `test_holiday_not_marked_absent_by_next_day_checkin_bleed` (existing) must
   still pass unchanged — a single dangling next-day IN with no OUT yields no
   sessions for the holiday date either way.
@@ -267,7 +333,8 @@ Extend `test_daily_job.py`:
   new `_dedupe_checkins`, new `_build_sessions`, `process_employee_for_date`,
   `_reset_attendance` (shared window-bound helper).
 - `employee_custom_attendance/employee_custom_attendance/doctype/flexible_hours_settings/` —
-  add `checkin_window_grace_hours` field (doctype JSON + migration).
+  add `checkin_window_grace_hours` and `max_session_hours` fields (doctype
+  JSON + migration).
 - `employee_custom_attendance/attendance/test_daily_job.py` — new test cases
   above.
 - `ARCHITECTURE.md` — update Assumptions #3/#4 and the Failure Scenarios
